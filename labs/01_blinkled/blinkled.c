@@ -18,7 +18,7 @@
 
 #define REG_RCC_CFGR   (volatile uint32_t*)(uintptr_t)0x40021004U // PLL Configuration Register
     #define VAL_RCC_CFGR_PLLSRC_HSE (0b10 << 15U)
-    #define VAL_RCC_CFGR_PLLMUL(FACTOR) ((FACTOR - 2U) << 18U)    // Valid: FACTOR = [2:16]
+    #define VAL_RCC_CFGR_PLLMUL(FACTOR) (((FACTOR) - 2U) << 18U)    // Valid: FACTOR = [2:16]
     #define VAL_RCC_CFGR_HPRE_NOTDIVIDED (0b0000U << 4U)
     #define VAL_RCC_CFGR_SW_PLL (0b10U)
     #define VAL_RCC_CFGR_SWS_MASK (0b11U << 2U)
@@ -28,7 +28,7 @@
 #define REG_RCC_AHBENR (volatile uint32_t*)(uintptr_t)0x40021014U // AHB1 Peripheral Clock Enable Register
     #define VAL_RCC_AHBENR_IOPCEN (0b1U << 19U)
 #define REG_RCC_CFGR2  (volatile uint32_t*)(uintptr_t)0x4002102CU // Clock configuration register 2
-    #define VAL_RCC_CFGR2_PREDIV(FACTOR) (FACTOR - 1U)            // Valid: FACTOR = [1:16]
+    #define VAL_RCC_CFGR2_PREDIV(FACTOR) ((FACTOR) - 1U)            // Valid: FACTOR = [1:16]
 
 //----------------
 // GPIO Registers
@@ -123,20 +123,13 @@ int main()
 
     while (1)
     {
-        *GPIOC_ODR |= GPIOC_ODRn(8U);
-        *GPIOC_ODR &= ~GPIOC_ODRn(9U);
-
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(8U), GPIOC_ODRn(8U));
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(9U), 0U);
 
         totally_accurate_quantum_femtosecond_precise_super_delay_3000_100000ms();
 
-        *GPIOC_ODR &= ~GPIOC_ODRn(8U);
-        *GPIOC_ODR |= GPIOC_ODRn(9U);
-
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(8U), 0U);
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(9U), GPIOC_ODRn(9U));
-
 
         totally_accurate_quantum_femtosecond_precise_super_delay_3000_100000ms();
     }

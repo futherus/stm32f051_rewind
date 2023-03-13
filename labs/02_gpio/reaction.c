@@ -348,91 +348,115 @@ void blinkingLed( GpioPort* led, uint32_t tick, uint32_t tickrate, bool is_blink
         gpioPortEmit( led, false);
 }
 
-const uint32_t PAUSE_TICKS = 1000;
+const uint32_t PAUSE_TICKS = 600;
 const uint32_t TICKRATE_WIN = 30;
 const uint32_t TICKRATE_LOSS = 200;
 
-// uint32_t numcat(uint16_t high, uint16_t low)
-// {
-//     return high << 16U | low;
-// }
+uint32_t segNumcat(uint8_t high, uint8_t low)
+{
+    return high * 100 + low;
+}
+
+typedef struct
+{
+    uint8_t score;
+    bool curr;
+    bool prev;
+    Button button;
+    GpioPort led;
+} Player;
 
 void ledOnButton()
 {
-    Button button_first = {
-        .port = {
+    SegDisplay seg = {
+        .number = 0
+    };
+
+    Player first = {
+        .score = 0,
+        .curr = 0,
+        .prev = 0,
+        .button = {
+            .port = {
+                .reg = GPIOC_BASE,
+                .number = 0
+            }
+        },
+        .led = {
             .reg = GPIOC_BASE,
-            .number = 0
+            .number = 2
         }
     };
+    gpioPortInit( &first.button.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
+    gpioPortInit( &first.led, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
-    gpioPortInit( &button_first.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
-
-    Button button_second = {
-        .port = {
+    Player second = {
+        .score = 0,
+        .curr = 0,
+        .prev = 0,
+        .button = {
+            .port = {
+                .reg = GPIOC_BASE,
+                .number = 1
+            }
+        },
+        .led = {
             .reg = GPIOC_BASE,
-            .number = 1
+            .number = 3
         }
     };
-    gpioPortInit( &button_second.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
+    gpioPortInit( &second.button.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
+    gpioPortInit( &second.led, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
-    GpioPort led_first = {
-        .reg = GPIOC_BASE,
-        .number = 2
-    };
-    gpioPortInit( &led_first, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
-    GpioPort led_second = {
-        .reg = GPIOC_BASE,
-        .number = 3
-    };
-    gpioPortInit( &led_second, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
- 
-    bool prev_press_first = false;
-    bool prev_press_second = false;
+    uint32_t tick = 0;
+    uint32_t pause_ticks = 0;
+    bool first_won = false;
+
     while (1)
     {
-        bool curr_press_first = buttonPoll( &button_first);
-        bool curr_press_second = buttonPoll( &button_second);
+        first.curr = buttonPoll( &first.button);
+        second.curr = buttonPoll( &second.button);
 
-        if (prev_press_first && prev_press_second)
+        if (pause_ticks > 0)
         {
-            prev_press_first = curr_press_first;
-            prev_press_second = curr_press_second;
-            continue;
+            blinkingLed( &first.led, tick, first_won ? TICKRATE_WIN : TICKRATE_LOSS, true);
+            blinkingLed( &second.led, tick, first_won ? TICKRATE_LOSS : TICKRATE_WIN, true);
+
+            pause_ticks--;
+            if (!pause_ticks)
+            {
+                gpioPortEmit( &first.led, false);
+                gpioPortEmit( &second.led, false);
+            } 
+        }
+        else
+        {
+            if (first.curr && second.curr)
+            {
+                if (first.prev && !second.prev)
+                {
+                    first_won = false;
+                    second.score++;
+                    pause_ticks = PAUSE_TICKS;
+                }
+                else if (!first.prev && second.prev)
+                {
+                    first_won = true;
+                    first.score++;
+                    pause_ticks = PAUSE_TICKS;
+                }
+            } 
         }
 
-        if (curr_press_first && curr_press_second)
-        {
-            if (prev_press_first)
-            {
-                for (uint32_t tick = 0; tick < PAUSE_TICKS; tick++)
-                {
-                    blinkingLed( &led_first, tick, TICKRATE_LOSS, true);
-                    blinkingLed( &led_second, tick, TICKRATE_WIN, true);
-                    to_get_more_accuracy_pay_2202_2013_2410_3805_1ms();
-                }
+        first.prev = first.curr;
+        second.prev = second.curr;
 
-                gpioPortEmit( &led_first, false);
-                gpioPortEmit( &led_second, false);
-            }
-            else if (prev_press_second)
-            {
-                for (uint32_t tick = 0; tick < PAUSE_TICKS; tick++)
-                {
-                    blinkingLed( &led_first, tick, TICKRATE_WIN, true);
-                    blinkingLed( &led_second, tick, TICKRATE_LOSS, true);
-                    to_get_more_accuracy_pay_2202_2013_2410_3805_1ms();
-                }
+        segSetNumber( &seg, segNumcat( first.score, second.score));
+        segUpdate( &seg, tick);
+        segShow( &seg);
 
-                gpioPortEmit( &led_first, false);
-                gpioPortEmit( &led_second, false);
-            }
-        } 
-
-        prev_press_first = curr_press_first;
-        prev_press_second = curr_press_second;
-
+        tick++;
         to_get_more_accuracy_pay_2202_2013_2410_3805_1ms();
     }
 }

@@ -22,7 +22,8 @@ LDFLAGS = \
 	-Wl,--warn-common \
 	-Wl,--fatal-warnings \
 	-Wl,-z,max-page-size=8 \
-	-Wl,-T,entry.lds
+	-Wl,-T,entry.lds \
+	-Wl,--no-warn-rwx-segments \
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -g

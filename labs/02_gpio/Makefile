@@ -23,7 +23,7 @@ LDFLAGS = \
 	-Wl,--fatal-warnings \
 	-Wl,-z,max-page-size=8 \
 	-Wl,-T,entry.lds \
-	-Wl,--no-warn-rwx-segments \
+	#-Wl,--no-warn-rwx-segments \
 
 ifeq ($(DEBUG),1)
 	CFLAGS += -g
@@ -35,7 +35,8 @@ endif
 
 SOURCES = \
 	entry.S \
-	reaction.c
+	reaction.c \
+	seg.c \
 
 OBJECTS_HALFWAY_DONE = $(SOURCES:%.c=build/%.o)
 OBJECTS              = $(OBJECTS_HALFWAY_DONE:%.S=build/%.o)

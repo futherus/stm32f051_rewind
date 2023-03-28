@@ -73,10 +73,10 @@ void board_gpio_init()
     *GPIOx_TYPER( GPIOA_BASE) = 0U;
 
     // (2) Configure PA0 as button:
-    MODIFY_REG( GPIOx_MODER( GPIOA_BASE), GPIOx_MODE_bits( 0, GPIOx_MODE_mask), GPIOx_MODE_bits( 0, GPIOx_MODE_input));
+    // MODIFY_REG( GPIOx_MODER( GPIOA_BASE), GPIOx_MODE_bits( 0, GPIOx_MODE_mask), GPIOx_MODE_bits( 0, GPIOx_MODE_input));
 
     // Configure PA0 as pull-down pin:
-    MODIFY_REG( GPIOx_PUPDR( GPIOA_BASE), GPIOx_PUPD_bits( 0, GPIOx_PUPD_mask), GPIOx_PUPD_bits( 0, GPIOx_PUPD_pulldown));
+    // MODIFY_REG( GPIOx_PUPDR( GPIOA_BASE), GPIOx_PUPD_bits( 0, GPIOx_PUPD_mask), GPIOx_PUPD_bits( 0, GPIOx_PUPD_pulldown));
 }
 
 //------
@@ -218,6 +218,16 @@ void ledOnButton()
     gpioPortInit( &second.button.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
     gpioPortInit( &second.led, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
+    Button reset_game = {
+        .port = {
+            .reg = GPIOA_BASE,
+            .number = 0
+        },
+        .saturation = 0,
+        .state = 0
+    };
+    gpioPortInit( &reset_game.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
+
     uint32_t tick = 0;
     uint32_t pause_ticks = 0;
     bool first_won = false;
@@ -227,6 +237,12 @@ void ledOnButton()
         first.curr = buttonPoll( &first.button);
         second.curr = buttonPoll( &second.button);
 
+        if (buttonPoll( &reset_game))
+        {
+            pause_ticks = PAUSE_TICKS;
+
+            first.score = second.score = 0;
+        }
         if (pause_ticks > 0)
         {
             blinkingLed( &first.led, tick, first_won ? TICKRATE_WIN : TICKRATE_LOSS, true);

@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "delay.h"
+
 //---------------
 // Macros
 //---------------
@@ -52,7 +54,7 @@
 //------
 
 #define CPU_FREQENCY 48000000U // CPU frequency: 48 MHz
-#define ONE_MILLISECOND CPU_FREQENCY/1000U
+#define ONE_MILLISECOND (CPU_FREQENCY / 1000U)
 
 void board_clocking_init()
 {
@@ -99,19 +101,20 @@ void board_gpio_init()
     *GPIOC_MODER |= GPIO_MODERn(9, GPIO_MODER_GPOUT);
 
     // (3) Configure PC type:
-    *GPIOC_TYPER |= GPIO_TYPERn(8);
-    *GPIOC_TYPER |= GPIO_TYPERn(9);
-    // &=
+    *GPIOC_TYPER &= ~GPIO_TYPERn(8);
+    *GPIOC_TYPER &= ~GPIO_TYPERn(9);
 }
 
-void totally_accurate_quantum_femtosecond_precise_super_delay_3000_100000ms()
+void totally_accurate_quantum_femtosecond_precise_super_delay_3000_1000ms()
 {
-    for (uint32_t i = 0; i < 100000U * ONE_MILLISECOND; ++i)
+    for (uint32_t i = 0; i < 1000U * ONE_MILLISECOND; ++i)
     {
         // Insert NOP for power consumption:
         __asm__ volatile("nop");
     }
 }
+
+void delay( uint32_t val);
 
 int main()
 {
@@ -121,16 +124,20 @@ int main()
 
     board_gpio_init();
 
+    uint32_t d = 1000U;
+
     while (1)
     {
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(8U), GPIOC_ODRn(8U));
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(9U), 0U);
 
-        totally_accurate_quantum_femtosecond_precise_super_delay_3000_100000ms();
+        delay( delay_msec2ticks( d, CPU_FREQENCY));
+        // totally_accurate_quantum_femtosecond_precise_super_delay_3000_1000ms();
 
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(8U), 0U);
         MODIFY_REG(GPIOC_ODR, GPIOC_ODRn(9U), GPIOC_ODRn(9U));
 
-        totally_accurate_quantum_femtosecond_precise_super_delay_3000_100000ms();
+        delay( delay_msec2ticks( d, CPU_FREQENCY));
+        // totally_accurate_quantum_femtosecond_precise_super_delay_3000_1000ms();
     }
 }

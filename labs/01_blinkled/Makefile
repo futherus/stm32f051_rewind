@@ -21,13 +21,13 @@ endif
 ifeq ($(QEMU),1)
 	CFLAGS += -g -DINSIDE_QEMU
 endif
-
 #-------
 # Files
 #-------
 
 SOURCES = \
 	entry.S \
+	delay.S \
 	blinkled.c
 
 OBJECTS_HALFWAY_DONE = $(SOURCES:%.c=build/%.o)
@@ -71,6 +71,10 @@ QEMU_FLAGS = \
 	-m 32M \
 	-icount 25 \
 	-gdb tcp::1234
+
+ifeq ($(GDB), 1)
+	QEMU_FLAGS += -S
+endif
 
 GDB_FLAGS = \
 	--eval-command="set architecture arm" \

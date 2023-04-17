@@ -37,6 +37,17 @@ SECTIONS
 
     __data_start_lma = LOADADDR(.data);
 
+    .bss :
+    {
+        . = ALIGN(4);
+        __bss_start_vma = .;
+
+        *(.bss)
+
+        . = ALIGN(4);
+        __bss_end_vma = .;
+    } >SRAM
+
     __stack_start = SRAM_VADDR + SRAM_SIZE;
 
     /DISCARD/ :

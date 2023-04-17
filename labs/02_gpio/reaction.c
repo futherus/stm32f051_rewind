@@ -42,8 +42,8 @@ void board_clocking_init()
     while ((*REG_RCC_CFGR & VAL_RCC_CFGR_SWS_MASK) != VAL_RCC_CFGR_SWS_PLL)
         ;
 
-    // (8) Set APB frequency to 24 MHz
-    *REG_RCC_CFGR |= VAL_RCC_CFGR_PPRE_2;
+    // (8) Set APB frequency to 48 MHz
+    MODIFY_REG( REG_RCC_CFGR, VAL_RCC_CFGR_PPRE_mask, VAL_RCC_CFGR_PPRE_notdiv);
 }
 
 void to_get_more_accuracy_pay_2202_2013_2410_3805_1ms()
@@ -77,6 +77,32 @@ void board_gpio_init()
 
     // Configure PA0 as pull-down pin:
     // MODIFY_REG( GPIOx_PUPDR( GPIOA_BASE), GPIOx_PUPD_bits( 0, GPIOx_PUPD_mask), GPIOx_PUPD_bits( 0, GPIOx_PUPD_pulldown));
+}
+
+//-----------------------
+// SysTick configuration
+//-----------------------
+
+void systick_init( uint32_t period_us)
+{
+    // (0) Read STM32F051 SysTick configuration:
+    // Assumptions:
+    // - There is a reference clock and it can be chosen as clock source.
+    // - The SYST_CALIB SKEW bit is 1.
+    uint32_t reload_value = period_us * (CPU_FREQENCY / 1000000U) / 8;
+
+    // (1) Program the reload value:
+    // *SYSTICK_RVR = (reload_value - 1U) & 0x00FFFFFFU;
+    MODIFY_REG( SYST_RVR, SYST_RVR_RELOAD, (reload_value - 1U));
+
+    // (2) Clear the current value:
+    // *SYSTICK_CVR = 0U;
+    MODIFY_REG( SYST_CVR, SYST_CVR_CURRENT, 0U);
+
+    // (3) Program the CSR:
+    // Watch out for the clock source!
+    // *SYSTICK_CSR = 0x3U;
+    MODIFY_REG( SYST_CSR, SYST_CSR_TICKINT | SYST_CSR_ENABLE, SYST_CSR_TICKINT | SYST_CSR_ENABLE); 
 }
 
 //------
@@ -158,9 +184,9 @@ void blinkingLed( GpioPort* led, uint32_t tick, uint32_t tickrate, bool is_blink
         gpioPortEmit( led, false);
 }
 
-const uint32_t PAUSE_TICKS = 600;
-const uint32_t TICKRATE_WIN = 30;
-const uint32_t TICKRATE_LOSS = 200;
+const uint32_t PAUSE_TICKS = 3000;
+const uint32_t TICKRATE_WIN = 150;
+const uint32_t TICKRATE_LOSS = 1000;
 
 uint32_t segNumcat( uint8_t high, uint8_t low)
 {
@@ -176,11 +202,83 @@ typedef struct
     GpioPort led;
 } Player;
 
-void ledOnButton()
+struct
 {
+    Player* first;
+    Player* second;
+
+    Button* reset_game;
+
+    SegDisplay* seg;
+
+    uint32_t tick;
+    uint32_t pause_ticks;
+    bool first_won;
+} gGame;
+
+void systickHandler()
+{
+    gGame.first->curr = buttonPoll( &gGame.first->button);
+    gGame.second->curr = buttonPoll( &gGame.second->button);
+
+    if (buttonPoll( gGame.reset_game))
+    {
+        gGame.pause_ticks = PAUSE_TICKS;
+
+        gGame.first->score = gGame.second->score = 0;
+    }
+    if (gGame.pause_ticks > 0)
+    {
+        blinkingLed( &gGame.first->led, gGame.tick, gGame.first_won ? TICKRATE_WIN : TICKRATE_LOSS, true);
+        blinkingLed( &gGame.second->led, gGame.tick, gGame.first_won ? TICKRATE_LOSS : TICKRATE_WIN, true);
+
+        gGame.pause_ticks--;
+        if (!gGame.pause_ticks)
+        {
+            gpioPortEmit( &gGame.first->led, false);
+            gpioPortEmit( &gGame.second->led, false);
+        } 
+    }
+    else
+    {
+        if (gGame.first->curr && gGame.second->curr)
+        {
+            if (gGame.first->prev && !gGame.second->prev)
+            {
+                gGame.first_won = false;
+                gGame.second->score++;
+                gGame.pause_ticks = PAUSE_TICKS;
+            }
+            else if (!gGame.first->prev && gGame.second->prev)
+            {
+                gGame.first_won = true;
+                gGame.first->score++;
+                gGame.pause_ticks = PAUSE_TICKS;
+            }
+        } 
+    }
+
+    gGame.first->prev = gGame.first->curr;
+    gGame.second->prev = gGame.second->curr;
+
+    segSetNumber( gGame.seg, segNumcat( gGame.first->score, gGame.second->score));
+    segUpdate( gGame.seg, gGame.tick);
+    segShow( gGame.seg);
+
+    gGame.tick++;
+    // to_get_more_accuracy_pay_2202_2013_2410_3805_1ms();
+}
+
+int main()
+{
+    board_clocking_init();
+
+    board_gpio_init();
+
     SegDisplay seg = {
         .number = 0
     };
+    gGame.seg = &seg;
 
     Player first = {
         .score = 0,
@@ -197,6 +295,7 @@ void ledOnButton()
             .number = 2
         }
     };
+    gGame.first = &first;
     gpioPortInit( &first.button.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
     gpioPortInit( &first.led, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
@@ -215,6 +314,7 @@ void ledOnButton()
             .number = 3
         }
     };
+    gGame.second = &second;
     gpioPortInit( &second.button.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
     gpioPortInit( &second.led, GPIOx_MODE_gpout, GPIOx_TYPE_pushpull, GPIOx_PUPD_none);
 
@@ -226,74 +326,17 @@ void ledOnButton()
         .saturation = 0,
         .state = 0
     };
+    gGame.reset_game = &reset_game;
     gpioPortInit( &reset_game.port, GPIOx_MODE_input, GPIOx_TYPE_pushpull, GPIOx_PUPD_pulldown);
 
-    uint32_t tick = 0;
-    uint32_t pause_ticks = 0;
-    bool first_won = false;
+    gGame.tick = 0;
+    gGame.pause_ticks = 0;
+    gGame.first_won = false;
 
-    while (1)
-    {
-        first.curr = buttonPoll( &first.button);
-        second.curr = buttonPoll( &second.button);
+    systick_init( 1000U);
 
-        if (buttonPoll( &reset_game))
-        {
-            pause_ticks = PAUSE_TICKS;
-
-            first.score = second.score = 0;
-        }
-        if (pause_ticks > 0)
-        {
-            blinkingLed( &first.led, tick, first_won ? TICKRATE_WIN : TICKRATE_LOSS, true);
-            blinkingLed( &second.led, tick, first_won ? TICKRATE_LOSS : TICKRATE_WIN, true);
-
-            pause_ticks--;
-            if (!pause_ticks)
-            {
-                gpioPortEmit( &first.led, false);
-                gpioPortEmit( &second.led, false);
-            } 
-        }
-        else
-        {
-            if (first.curr && second.curr)
-            {
-                if (first.prev && !second.prev)
-                {
-                    first_won = false;
-                    second.score++;
-                    pause_ticks = PAUSE_TICKS;
-                }
-                else if (!first.prev && second.prev)
-                {
-                    first_won = true;
-                    first.score++;
-                    pause_ticks = PAUSE_TICKS;
-                }
-            } 
-        }
-
-        first.prev = first.curr;
-        second.prev = second.curr;
-
-        segSetNumber( &seg, segNumcat( first.score, second.score));
-        segUpdate( &seg, tick);
-        segShow( &seg);
-
-        tick++;
-        to_get_more_accuracy_pay_2202_2013_2410_3805_1ms();
-    }
-}
-
-
-int main()
-{
-    board_clocking_init();
-
-    board_gpio_init();
-
-    ledOnButton();
+    while (true)
+        ;
 
     return 0;
 }

@@ -7,6 +7,8 @@
 
 #define MODIFY_REG( REG, MODIFYMASK, VALUE) *(REG) = ( ((MODIFYMASK) & (VALUE)) | (*(REG) & ~(MODIFYMASK)) )
 
+#define READ_REG( REG, READMASK) (*(REG) & (READMASK))
+
 //---------------
 // RCC Registers
 //---------------
@@ -24,7 +26,9 @@
     #define VAL_RCC_CFGR_SW_PLL (0b10U)
     #define VAL_RCC_CFGR_SWS_MASK (0b11U << 2U)
     #define VAL_RCC_CFGR_SWS_PLL (0b10U << 2U)
-    #define VAL_RCC_CFGR_PPRE_2 (0b100 << 8U)
+    #define VAL_RCC_CFGR_PPRE_mask (0b111U << 8U)
+    #define VAL_RCC_CFGR_PPRE_notdiv (0b000U << 8U)
+    #define VAL_RCC_CFGR_PPRE_2 (0b100U << 8U)
 
 #define REG_RCC_AHBENR (volatile uint32_t*)(uintptr_t)0x40021014U // AHB1 Peripheral Clock Enable Register
     #define VAL_RCC_AHBENR_IOPAEN (0b1U << 17U)
@@ -36,6 +40,7 @@
 //----------------
 // GPIO Registers
 //----------------
+
 #define GPIOA_BASE (uintptr_t)(0x48000000U) // GPIO port mode register
 #define GPIOC_BASE (uintptr_t)(0x48000800U) // GPIO port mode register
 
@@ -72,5 +77,34 @@
 #define GPIOx_ODR( BASE) ((volatile uint32_t*)((uintptr_t)(BASE) + 0x14U))
     #define GPIOx_OD_bits( N, MODE) ((MODE) << (N))
     #define GPIOx_OD_mask (0b1U)
+
+#define GPIOx_BSRR( BASE) ((volatile uint32_t*)((uintptr_t)(BASE) + 0x18U))
+    #define GPIOx_BSRR_reset_bit( N) (0b1U << (16U + (N)))
+    #define GPIOx_BSRR_set_bit( N)   (0b1U << (N))
+
+//-------------------
+// SysTick registers
+//-------------------
+
+#define SYST_CSR   (volatile uint32_t*)(uintptr_t)0xE000E010U // SysTick Control and Status Register
+    #define SYST_CSR_COUNTFLAG (1U << 16U)
+    #define SYST_CSR_CLKSOURCE (1U <<  2U)
+        #define SYST_CLR_CLKSOURCE_mask (1U)
+        #define SYST_CSR_CLKSOURCE_ref  (0U)
+        #define SYST_CSR_CLKSOURCE_proc (1U)
+
+    #define SYST_CSR_TICKINT   (1U <<  1U)
+    #define SYST_CSR_ENABLE    (1U <<  0U)
+
+#define SYST_RVR   (volatile uint32_t*)(uintptr_t)0xE000E014U // SysTick Reload Value Register
+    #define SYST_RVR_RELOAD (0xFFFFFFU)
+
+#define SYST_CVR   (volatile uint32_t*)(uintptr_t)0xE000E018U // SysTick Current Value Register
+    #define SYST_CVR_CURRENT (0xFFFFFFU)
+
+#define SYST_CALIB (volatile uint32_t*)(uintptr_t)0xE000E01CU // SysTick Calibration Value Register
+    #define SYST_CALIB_NOREF (1U << 31U)
+    #define SYST_CALIB_SKEW  (1U << 30U)
+    #define SYST_CALIB_TENMS (0xFFFFFFU)
 
 #endif // HAL_H
